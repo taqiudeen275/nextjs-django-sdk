@@ -1,0 +1,26 @@
+{
+	"name": "nextjs-django-sdk",
+	"version": "1.0.0",
+	"description": "Next.js 15 SDK for Django REST Framework with Simple JWT",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"scripts": {
+	  "build": "tsc",
+	  "test": "jest",
+	  "lint": "eslint src/**/*.ts"
+	},
+	"dependencies": {
+	  "jwt-decode": "^4.0.0",
+	  "swr": "^2.2.4"
+	},
+	"peerDependencies": {
+	  "next": "^15.0.0",
+	  "react": "^18.0.0"
+	},
+	"devDependencies": {
+	  "@types/node": "^20.0.0",
+	  "@types/react": "^18.0.0",
+	  "typescript": "^5.7.2",
+	  "eslint": "^8.0.0"
+	}
+  }
