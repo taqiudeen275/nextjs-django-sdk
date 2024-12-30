@@ -4,106 +4,117 @@ import { cookies } from 'next/headers';
 import { jwtDecode } from 'jwt-decode';
 import type { DjangoSDKConfig } from '../types';
 
-export class ServerApiClient {
-  private config: DjangoSDKConfig;
-
-  constructor(config: DjangoSDKConfig) {
-    this.config = {
-      tokenPrefix: 'Bearer',
-      accessTokenLifetime: 300,
-      refreshTokenLifetime: 86400,
-      autoRefresh: true,
-      csrfEnabled: true,
-      ...config
-    };
+async function prepareHeaders(
+  config: DjangoSDKConfig,
+  initHeaders?: HeadersInit
+): Promise<Headers> {
+  const headers = new Headers(initHeaders);
+  headers.set('Content-Type', 'application/json');
+  
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get('access_token')?.value;
+  
+  if (accessToken) {
+    const isExpired = isTokenExpired(accessToken);
+    if (isExpired && config.autoRefresh) {
+      const newToken = await refreshServerToken(config);
+      if (newToken) {
+        headers.set('Authorization', `${config.tokenPrefix || 'Bearer'} ${newToken}`);
+      }
+    } else {
+      headers.set('Authorization', `${config.tokenPrefix || 'Bearer'} ${accessToken}`);
+    }
   }
 
-  async fetch<T>(
-    input: RequestInfo,
-    init?: RequestInit & { skipAuth?: boolean }
-  ): Promise<T> {
-    const { skipAuth, ...initOptions } = init || {};
-    
-    if (!skipAuth) {
-      const headers = await this.prepareHeaders(initOptions?.headers);
-      initOptions.headers = headers;
+  if (config.csrfEnabled) {
+    const csrfToken = cookieStore.get('csrftoken')?.value;
+    if (csrfToken) {
+      headers.set('X-CSRFToken', csrfToken);
     }
+  }
 
-    const response = await fetch(input, {
-      ...initOptions,
+  return headers;
+}
+
+function isTokenExpired(token: string): boolean {
+  try {
+    const decoded = jwtDecode(token);
+    return decoded.exp ? decoded.exp * 1000 < Date.now() : true;
+  } catch {
+    return true;
+  }
+}
+
+async function refreshServerToken(config: DjangoSDKConfig): Promise<string | null> {
+  const cookieStore = await cookies();
+  const refreshToken = cookieStore.get('refresh_token')?.value;
+  if (!refreshToken) return null;
+
+  try {
+    const response = await fetch(`${config.baseUrl}/auth/refresh/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refresh: refreshToken }),
       credentials: 'include',
     });
 
     if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`);
+      throw new Error('Token refresh failed');
     }
 
-    return response.json();
-  }
-
-  private async prepareHeaders(initHeaders?: HeadersInit): Promise<Headers> {
-    const headers = new Headers(initHeaders);
-    headers.set('Content-Type', 'application/json');
+    const data = await response.json();
     
-    let accessToken = (await cookies()).get('access_token')?.value;
-    
-    if (accessToken && this.isTokenExpired(accessToken) && this.config.autoRefresh) {
-      accessToken = await this.refreshToken();
-    }
-
-    if (accessToken) {
-      headers.set('Authorization', `${this.config.tokenPrefix} ${accessToken}`);
-    }
-
-    if (this.config.csrfEnabled) {
-      const csrfToken = (await cookies()).get('csrftoken')?.value;
-      if (csrfToken) {
-        headers.set('X-CSRFToken', csrfToken);
-      }
-    }
-
-    return headers;
-  }
-
-  private async refreshToken(): Promise<string> {
-    const refreshToken = (await cookies()).get('refresh_token')?.value;
-    if (!refreshToken) throw new Error('No refresh token available');
-
-    const response = await this.fetch<{ access: string }>(
-      `${this.config.baseUrl}/auth/refresh/`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ refresh: refreshToken }),
-        skipAuth: true,
-      }
-    );
-
-    this.setAccessToken(response.access);
-    return response.access;
-  }
-
-  private isTokenExpired(token: string): boolean {
-    try {
-      const decoded = jwtDecode(token);
-      return decoded.exp ? decoded.exp * 1000 < Date.now() : true;
-    } catch {
-      return true;
-    }
-  }
-
-  private async setAccessToken(token: string) {
-    (await cookies()).set({
+    cookieStore.set({
       name: 'access_token',
-      value: token,
+      value: data.access,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       path: '/',
-      maxAge: this.config.accessTokenLifetime,
+      maxAge: config.accessTokenLifetime || 300,
     });
+
+    return data.access;
+  } catch (error) {
+    console.error('Server token refresh failed:', error);
+    return null;
   }
 }
 
 export async function createServerAction(config: DjangoSDKConfig) {
-  return new ServerApiClient(config);
+  const defaultConfig: DjangoSDKConfig = {
+    tokenPrefix: 'Bearer',
+    accessTokenLifetime: 300,
+    refreshTokenLifetime: 86400,
+    autoRefresh: true,
+    csrfEnabled: true,
+    ...config
+  };
+
+  return {
+    async fetch<T>(
+      input: RequestInfo,
+      init?: RequestInit & { skipAuth?: boolean }
+    ): Promise<T> {
+      const { skipAuth, ...initOptions } = init || {};
+      
+      if (!skipAuth) {
+        const headers = await prepareHeaders(defaultConfig, initOptions?.headers);
+        initOptions.headers = headers;
+      }
+
+      const response = await fetch(input, {
+        ...initOptions,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.statusText}`);
+      }
+
+      return response.json();
+    }
+  };
 }

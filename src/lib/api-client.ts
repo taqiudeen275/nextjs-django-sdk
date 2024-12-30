@@ -1,6 +1,7 @@
-import { cookies } from 'next/headers';
-import { jwtDecode } from 'jwt-decode';
+'use client';
+
 import type { DjangoSDKConfig, TokenPair } from '../types';
+import { jwtDecode } from 'jwt-decode';
 
 export class ApiClient {
   private config: DjangoSDKConfig;
@@ -42,18 +43,20 @@ export class ApiClient {
   private async prepareHeaders(initHeaders?: HeadersInit): Promise<Headers> {
     const headers = new Headers(initHeaders);
     
-    let accessToken = (await cookies()).get('access_token')?.value;
+    // Get tokens from cookies using client-side methods
+    const accessToken = this.getCookie('access_token');
     
     if (accessToken && this.isTokenExpired(accessToken) && this.config.autoRefresh) {
-      accessToken = await this.refreshToken();
-    }
-
-    if (accessToken) {
+      const newToken = await this.refreshToken();
+      if (newToken) {
+        headers.set('Authorization', `${this.config.tokenPrefix} ${newToken}`);
+      }
+    } else if (accessToken) {
       headers.set('Authorization', `${this.config.tokenPrefix} ${accessToken}`);
     }
 
     if (this.config.csrfEnabled) {
-      const csrfToken = (await cookies()).get('csrftoken')?.value;
+      const csrfToken = this.getCookie('csrftoken');
       if (csrfToken) {
         headers.set('X-CSRFToken', csrfToken);
       }
@@ -62,21 +65,36 @@ export class ApiClient {
     return headers;
   }
 
-  private async refreshToken(): Promise<string> {
-    const refreshToken = (await cookies()).get('refresh_token')?.value;
+  private getCookie(name: string): string | undefined {
+    if (typeof document === 'undefined') return undefined;
+    
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(';').shift();
+    return undefined;
+  }
+
+  private async refreshToken(): Promise<string | null> {
+    const refreshToken = this.getCookie('refresh_token');
     if (!refreshToken) throw new Error('No refresh token available');
 
-    const response = await this.fetch<{ access: string }>(
-      `${this.config.baseUrl}/auth/refresh/`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ refresh: refreshToken }),
-        skipAuth: true,
-      }
-    );
+    try {
+      const response = await this.fetch<TokenPair>(
+        `${this.config.baseUrl}/auth/refresh/`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ refresh: refreshToken }),
+          skipAuth: true,
+        }
+      );
 
-    this.setAccessToken(response.access);
-    return response.access;
+      document.cookie = `access_token=${response.access}; path=/; max-age=${this.config.accessTokenLifetime}; samesite=strict${process.env.NODE_ENV === 'production' ? '; secure' : ''}`;
+      
+      return response.access;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      return null;
+    }
   }
 
   private isTokenExpired(token: string): boolean {
@@ -86,17 +104,5 @@ export class ApiClient {
     } catch {
       return true;
     }
-  }
-
-  private async setAccessToken(token: string) {
-    (await cookies()).set({
-      name: 'access_token',
-      value: token,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: this.config.accessTokenLifetime,
-    });
   }
 }
