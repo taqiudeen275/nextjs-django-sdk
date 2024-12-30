@@ -1,20 +1,28 @@
-# Next.js Django SDK
+Okay, here's a comprehensive README.md file for the `nextjs-django-client` package, incorporating best practices for open-source project documentation:
 
-A comprehensive SDK for integrating Next.js 15+ applications with Django REST Framework backends using Simple JWT authentication. Built with TypeScript and featuring full support for React Server Components, Client Components, and SWR data fetching.
+```markdown
+# Next.js Django Client SDK
+
+[![npm version](https://badge.fury.io/js/nextjs-django-client.svg)](https://badge.fury.io/js/nextjs-django-client)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+A modern, type-safe SDK for integrating Next.js 15+ applications with Django REST Framework backends using Simple JWT authentication. Built specifically for the Next.js App Router with full support for React Server Components, Server Actions, and Client Components.
 
 ## Features
 
-- 🔐 Built-in JWT authentication handling
-- 🔄 Automatic token refresh
-- 🎯 Server Component support
-- ⚡ SWR integration for efficient data fetching
-- 🔒 CSRF protection
-- 🍪 Secure cookie handling
-- 📱 TypeScript support
-- 🚀 React Server Components & Server Actions ready
-- 🎭 Built for Next.js 15+
+-   🔐 **Secure JWT Authentication:** Automatic token refresh and secure cookie handling using the `HttpOnly` flag.
+-   🎯 **Full Server Component & Server Actions Support:** Seamlessly fetch data and perform actions on the server.
+-   ⚡ **Built-in SWR Data Fetching:** Leverage SWR's caching, revalidation, and performance benefits with TypeScript support.
+-   🔒 **CSRF Protection:** Built-in protection against Cross-Site Request Forgery attacks.
+-   🚀 **Optimized for Next.js 15+ App Router:** Designed to work efficiently with the latest Next.js features.
+-   📱 **Type-Safe API:** Enjoy a robust development experience with full TypeScript support.
+-   🔄 **Automatic Token Management:** Handles token storage, refresh, and expiration transparently.
+-   🎭 **Flexible Data Fetching:** Supports both client-side and server-side data fetching patterns.
+-   ⚙️ **Configurable:** Customize token lifetimes, security options, and API request behavior.
 
 ## Installation
+
+Install the package using your preferred package manager:
 
 ```bash
 npm install nextjs-django-client
@@ -26,25 +34,29 @@ pnpm add nextjs-django-client
 
 ## Quick Start
 
-### 1. Set up the Provider
+### 1. Set up the ApiProvider
+
+Wrap your application with the `ApiProvider` to configure the SDK and provide API client access to your components:
 
 ```typescript
-// app/providers.tsx
+// app/providers.tsx (Client Component)
 'use client';
 
 import { ApiProvider } from 'nextjs-django-client';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <ApiProvider config={{
-      baseUrl: process.env.NEXT_PUBLIC_API_URL!,
-      // Optional configurations
-      tokenPrefix: 'Bearer',
-      accessTokenLifetime: 300, // 5 minutes
-      refreshTokenLifetime: 86400, // 24 hours
-      autoRefresh: true,
-      csrfEnabled: true
-    }}>
+    <ApiProvider
+      config={{
+        baseUrl: process.env.NEXT_PUBLIC_API_URL!, // Your Django API base URL
+        // Optional configurations:
+        tokenPrefix: 'Bearer', // Default: 'Bearer'
+        accessTokenLifetime: 300, // Default: 300 (5 minutes)
+        refreshTokenLifetime: 86400, // Default: 86400 (24 hours)
+        autoRefresh: true, // Default: true
+        csrfEnabled: true, // Default: true
+      }}
+    >
       {children}
     </ApiProvider>
   );
@@ -54,7 +66,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 import { Providers } from './providers';
 
 export default function RootLayout({
-  children
+  children,
 }: {
   children: React.ReactNode;
 }) {
@@ -68,10 +80,12 @@ export default function RootLayout({
 }
 ```
 
-### 2. Authentication in Client Components
+### 2. Client-Side Authentication
+
+Use the `useAuth` hook to handle user login, logout, and access user information in your Client Components:
 
 ```typescript
-// app/components/LoginForm.tsx
+// app/components/LoginForm.tsx (Client Component)
 'use client';
 
 import { useAuth, useApiClient } from 'nextjs-django-client';
@@ -83,34 +97,87 @@ export function LoginForm() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    
+    const username = formData.get('username') as string;
+    const password = formData.get('password') as string;
+
     try {
-      await login(
-        formData.get('username') as string,
-        formData.get('password') as string
-      );
-      // Redirect or handle success
+      await login(username, password);
+      // Handle successful login (e.g., redirect to dashboard)
     } catch (error) {
-      // Handle error
+      // Handle login error (e.g., display error message)
+      if (error instanceof Error) {
+        console.error('Login error:', error.message);
+      }
     }
+  }
+
+  if (user) {
+    return <div>Welcome, {user.username}!</div>;
   }
 
   return (
     <form onSubmit={handleSubmit}>
-      <input name="username" required />
-      <input name="password" type="password" required />
+      <div>
+        <label htmlFor="username">Username</label>
+        <input id="username" name="username" type="text" required />
+      </div>
+      <div>
+        <label htmlFor="password">Password</label>
+        <input id="password" name="password" type="password" required />
+      </div>
       <button type="submit" disabled={isLoading}>
-        {isLoading ? 'Loading...' : 'Login'}
+        {isLoading ? 'Logging in...' : 'Login'}
       </button>
     </form>
   );
 }
 ```
 
-### 3. Data Fetching with SWR
+### 3. Server-Side Data Fetching
+
+Use `createServerAction` to create an API client instance for secure data fetching within Server Components or Server Actions:
 
 ```typescript
-// app/components/Posts.tsx
+// app/posts/page.tsx (Server Component)
+import { createServerAction } from 'nextjs-django-client';
+
+interface Post {
+  id: number;
+  title: string;
+  content: string;
+}
+
+export default async function PostsPage() {
+  const api = await createServerAction({
+    baseUrl: process.env.API_URL!, // Your Django API base URL (can be different from client-side)
+  });
+
+  try {
+    const posts = await api.fetch<Post[]>('/api/posts/');
+
+    return (
+      <div>
+        <h1>Posts</h1>
+        {posts.map((post) => (
+          <article key={post.id}>
+            <h2>{post.title}</h2>
+            <p>{post.content}</p>
+          </article>
+        ))}
+      </div>
+    );
+  } catch (error) {
+    return <div>Failed to load posts.</div>;
+  }
+}
+```
+
+### 4. Client-Side Data Fetching with SWR
+
+Use the `useApi` hook to fetch data on the client-side with SWR's caching and revalidation features:
+
+```typescript
+// app/components/Posts.tsx (Client Component)
 'use client';
 
 import { useApi, useApiClient } from 'nextjs-django-client';
@@ -123,14 +190,22 @@ interface Post {
 
 export function Posts() {
   const apiClient = useApiClient();
-  const { data: posts, error, isLoading } = useApi<Post[]>('/api/posts/', apiClient);
+  const {
+    data: posts,
+    error,
+    isLoading,
+  } = useApi<Post[]>('/api/posts/', apiClient, {
+    revalidateOnFocus: true,
+    refreshInterval: 30000, // Refresh every 30 seconds (optional)
+  });
 
-  if (error) return <div>Failed to load posts</div>;
+  if (error) return <div>Failed to load posts.</div>;
   if (isLoading) return <div>Loading...</div>;
 
   return (
     <div>
-      {posts?.map(post => (
+      <h1>Posts</h1>
+      {posts?.map((post) => (
         <article key={post.id}>
           <h2>{post.title}</h2>
           <p>{post.content}</p>
@@ -141,65 +216,41 @@ export function Posts() {
 }
 ```
 
-### 4. Server Component Usage
-
-```typescript
-// app/posts/page.tsx
-import { createServerAction } from 'nextjs-django-client';
-
-interface Post {
-  id: number;
-  title: string;
-  content: string;
-}
-
-export default async function PostsPage() {
-  const api = await createServerAction({
-    baseUrl: process.env.API_URL!
-  });
-
-  try {
-    const posts = await api.fetch<Post[]>('/api/posts/');
-    
-    return (
-      <div>
-        {posts.map(post => (
-          <article key={post.id}>
-            <h2>{post.title}</h2>
-            <p>{post.content}</p>
-          </article>
-        ))}
-      </div>
-    );
-  } catch (error) {
-    return <div>Failed to load posts</div>;
-  }
-}
-```
-
 ## Advanced Usage
 
-### Custom Hooks with SWR
+### Protected API Routes with Middleware
+
+Create a `middleware.ts` file to protect routes that require authentication. This example protects all routes under `/dashboard`:
 
 ```typescript
-// hooks/usePosts.ts
-'use client';
+// middleware.ts
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { cookies } from 'next/headers';
 
-import { useApi, useApiClient } from 'nextjs-django-client';
+export function middleware(request: NextRequest) {
+  const accessToken = cookies().get('access_token')?.value;
 
-export function usePosts(page = 1) {
-  const apiClient = useApiClient();
-  return useApi(`/api/posts/?page=${page}`, apiClient, {
-    revalidateOnFocus: false,
-    refreshInterval: 30000 // Refresh every 30 seconds
-  });
+  // Protect routes starting with /dashboard
+  if (!accessToken && request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+
+  return NextResponse.next();
 }
+
+// Matcher config to apply the middleware to specific paths
+export const config = {
+  matcher: '/dashboard/:path*',
+};
 ```
 
 ### File Uploads
 
+Handle file uploads using `FormData` and the `apiClient`:
+
 ```typescript
-// app/components/FileUpload.tsx
+// app/components/FileUpload.tsx (Client Component)
 'use client';
 
 import { useApiClient } from 'nextjs-django-client';
@@ -215,97 +266,66 @@ export function FileUpload() {
       await apiClient.fetch('/api/upload/', {
         method: 'POST',
         body: formData,
-        headers: {
-          // Don't set Content-Type, let the browser set it with the boundary
-        },
       });
+      // Handle successful upload
     } catch (error) {
       console.error('Upload failed:', error);
     }
   }
 
   return (
-    <input 
-      type="file" 
-      onChange={e => e.target.files?.[0] && handleUpload(e.target.files[0])} 
+    <input
+      type="file"
+      onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
     />
   );
 }
 ```
 
-### Protected Routes
+### Custom API Hooks
+
+Create reusable custom hooks to encapsulate API calls and SWR logic:
 
 ```typescript
-// middleware.ts
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { cookies } from 'next/headers';
+// hooks/usePosts.ts (Client Hook)
+'use client';
 
-export function middleware(request: NextRequest) {
-  const accessToken = cookies().get('access_token');
+import { useApi, useApiClient } from 'nextjs-django-client';
+import type { Post } from '@/types'; // Assuming you have a Post type defined
 
-  if (!accessToken && request.nextUrl.pathname.startsWith('/dashboard')) {
-    return NextResponse.redirect(new URL('/login', request.url));
-  }
-
-  return NextResponse.next();
-}
-
-export const config = {
-  matcher: '/dashboard/:path*',
-};
-```
-
-### Error Handling
-
-```typescript
-// utils/api-errors.ts
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    public message: string,
-    public data?: any
-  ) {
-    super(message);
-  }
-}
-
-// Using with the SDK
-try {
-  const data = await apiClient.fetch('/api/protected-resource/');
-} catch (error) {
-  if (error instanceof ApiError) {
-    switch (error.status) {
-      case 401:
-        // Handle unauthorized
-        break;
-      case 403:
-        // Handle forbidden
-        break;
-      default:
-        // Handle other errors
+export function usePosts(page = 1) {
+  const apiClient = useApiClient();
+  return useApi<Post[]>(
+    `/api/posts/?page=${page}`,
+    apiClient,
+    {
+      revalidateOnFocus: false,
+      refreshInterval: 30000,
     }
-  }
+  );
 }
 ```
 
 ## Configuration Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| baseUrl | string | required | The base URL of your Django API |
-| tokenPrefix | string | 'Bearer' | The prefix used in Authorization header |
-| accessTokenLifetime | number | 300 | Access token lifetime in seconds |
-| refreshTokenLifetime | number | 86400 | Refresh token lifetime in seconds |
-| autoRefresh | boolean | true | Automatically refresh expired tokens |
-| csrfEnabled | boolean | true | Enable CSRF protection |
+The `ApiProvider` accepts the following configuration options:
 
-## Django Backend Setup
+| Option                 | Type      | Default     | Description                                                                                                |
+| :--------------------- | :-------- | :---------- | :--------------------------------------------------------------------------------------------------------- |
+| `baseUrl`              | `string`  | **Required** | The base URL of your Django API.                                                                        |
+| `tokenPrefix`          | `string`  | `'Bearer'`  | The prefix used in the `Authorization` header when sending requests.                                    |
+| `accessTokenLifetime`  | `number`  | `300`       | The lifetime of the access token in seconds (5 minutes).                                                |
+| `refreshTokenLifetime` | `number`  | `86400`     | The lifetime of the refresh token in seconds (24 hours).                                               |
+| `autoRefresh`          | `boolean` | `true`      | Whether to automatically refresh the access token when it expires using the refresh token.               |
+| `csrfEnabled`          | `boolean` | `true`      | Whether to enable CSRF protection. If enabled, the SDK will send the `X-CSRFToken` header with requests. |
 
-Ensure your Django REST Framework backend is configured with Simple JWT:
+## Django Backend Configuration
+
+Configure your Django REST Framework backend to use `SimpleJWT` for authentication and set up CORS to allow requests from your Next.js application:
 
 ```python
 # settings.py
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -315,19 +335,120 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
+    'ROTATE_REFRESH_TOKENS': True,  # Rotate refresh tokens on each refresh
+    'BLACKLIST_AFTER_ROTATION': True, # Invalidate old refresh tokens
+    'UPDATE_LAST_LOGIN': True, # Update the user's last_login field on successful login
+
+    # Token Signing Key (Keep this secret!)
+    'SIGNING_KEY': os.environ.get('SECRET_KEY'), # Fetch from environment variable
+
+    # Token Type
+    'AUTH_HEADER_TYPES': ('Bearer',), # Default
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',), # Default
+    'TOKEN_TYPE_CLAIM': 'token_type', # Default
+
+    # User ID Field and Claim
+    'USER_ID_FIELD': 'id', # Default
+    'USER_ID_CLAIM': 'user_id', # Default
+
+    # JTI (JWT ID) Claim
+    'JTI_CLAIM': 'jti', # Default
+
+    # SLIDING_TOKEN_LIFETIME, SLIDING_TOKEN_REFRESH_LIFETIME
+    # are deprecated in favor of ACCESS_TOKEN_LIFETIME and REFRESH_TOKEN_LIFETIME
 }
 
+# CORS Settings
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Your Next.js development server
-    "https://your-production-domain.com",
+    "https://your-nextjs-app.com", # Your production Next.js domain
 ]
 
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = True # Allow cookies to be sent with cross-origin requests
+
+# CSRF Settings (Recommended)
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "https://your-nextjs-app.com",
+]
+```
+
+**Important Security Notes (Django):**
+
+*   **`SECRET_KEY`:** Store your Django `SECRET_KEY` securely as an environment variable and **never** commit it to your code repository.
+*   **`ROTATE_REFRESH_TOKENS` and `BLACKLIST_AFTER_ROTATION`:** These settings are highly recommended to improve the security of your refresh tokens.
+*   **HTTPS:** Always use HTTPS in production to protect data transmitted between the client and server.
+
+## TypeScript Support
+
+The `nextjs-django-client` package is fully typed. You can extend the base `User` type to match your Django user model:
+
+```typescript
+import type { User } from 'nextjs-django-client';
+
+// Define your custom user properties
+interface CustomUser extends User {
+  firstName: string;
+  lastName: string;
+  role: 'admin' | 'user';
+}
+
+// Use your custom user type with useAuth
+const { user } = useAuth<CustomUser>(apiClient);
+```
+
+## Error Handling
+
+The SDK provides detailed error information through the `ApiError` class. Handle errors gracefully in your components:
+
+```typescript
+try {
+  const data = await apiClient.fetch('/api/protected/');
+} catch (error) {
+  if (error instanceof ApiError) {
+    switch (error.status) {
+      case 401:
+        // Handle 401 Unauthorized (e.g., redirect to login)
+        console.error('Unauthorized:', error.message);
+        break;
+      case 403:
+        // Handle 403 Forbidden (e.g., show access denied message)
+        console.error('Forbidden:', error.message);
+        break;
+      case 404:
+        // Handle 404 Not Found
+        console.error('Not Found:', error.message);
+        break;
+      case 500:
+        // Handle 500 Internal Server Error
+        console.error('Server Error:', error.message);
+        break;
+      default:
+        // Handle other API errors
+        console.error('API Error:', error.message, error.details);
+    }
+  } else {
+    // Handle non-API errors (e.g., network issues)
+    console.error('An unexpected error occurred:', error);
+  }
+}
 ```
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+We welcome contributions! If you'd like to contribute to the project, please follow these steps:
 
+1. **Fork** the repository.
+2. Create a new branch for your feature or bug fix: `git checkout -b feature/my-new-feature` or `git checkout -b bugfix/fix-some-issue`
+3. Make your changes and commit them with clear, descriptive commit messages.
+4. **Write tests** to ensure your code works as expected and prevents regressions.
+5. **Document** any new features or changes in the README.
+6. Open a **Pull Request** against the `main` branch, describing your changes and why they are necessary.
+
+For major changes or new features, please open an **Issue** first to discuss your ideas with the maintainers.
+
+
+## Support
+
+If you encounter any issues or have questions about the package, please feel free to open an issue on the [GitHub repository](https://github.com/taqiudeen275/nextjs-django-sdk). We appreciate your feedback!
+```
