@@ -1,4 +1,3 @@
-Okay, here's a comprehensive README.md file for the `nextjs-django-client` package, incorporating best practices for open-source project documentation:
 
 ```markdown
 # Next.js Django Client SDK
