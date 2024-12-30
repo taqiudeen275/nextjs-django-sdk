@@ -17,11 +17,11 @@ A comprehensive SDK for integrating Next.js 15+ applications with Django REST Fr
 ## Installation
 
 ```bash
-npm install nextjs-django-sdk
+npm install nextjs-django-client
 # or
-yarn add nextjs-django-sdk
+yarn add nextjs-django-client
 # or
-pnpm add nextjs-django-sdk
+pnpm add nextjs-django-client
 ```
 
 ## Quick Start
@@ -32,7 +32,7 @@ pnpm add nextjs-django-sdk
 // app/providers.tsx
 'use client';
 
-import { ApiProvider } from 'nextjs-django-sdk';
+import { ApiProvider } from 'nextjs-django-client';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -74,7 +74,7 @@ export default function RootLayout({
 // app/components/LoginForm.tsx
 'use client';
 
-import { useAuth, useApiClient } from 'nextjs-django-sdk';
+import { useAuth, useApiClient } from 'nextjs-django-client';
 
 export function LoginForm() {
   const apiClient = useApiClient();
@@ -113,7 +113,7 @@ export function LoginForm() {
 // app/components/Posts.tsx
 'use client';
 
-import { useApi, useApiClient } from 'nextjs-django-sdk';
+import { useApi, useApiClient } from 'nextjs-django-client';
 
 interface Post {
   id: number;
@@ -145,7 +145,7 @@ export function Posts() {
 
 ```typescript
 // app/posts/page.tsx
-import { createServerAction } from 'nextjs-django-sdk';
+import { createServerAction } from 'nextjs-django-client';
 
 interface Post {
   id: number;
@@ -185,7 +185,7 @@ export default async function PostsPage() {
 // hooks/usePosts.ts
 'use client';
 
-import { useApi, useApiClient } from 'nextjs-django-sdk';
+import { useApi, useApiClient } from 'nextjs-django-client';
 
 export function usePosts(page = 1) {
   const apiClient = useApiClient();
@@ -202,7 +202,7 @@ export function usePosts(page = 1) {
 // app/components/FileUpload.tsx
 'use client';
 
-import { useApiClient } from 'nextjs-django-sdk';
+import { useApiClient } from 'nextjs-django-client';
 
 export function FileUpload() {
   const apiClient = useApiClient();

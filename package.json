@@ -1,6 +1,6 @@
 {
-	"name": "nextjs-django-sdk",
-	"version": "1.1.0",
+	"name": "nextjs-django-client",
+	"version": "0.1.1",
 	"description": "Next.js 15 SDK for Django REST Framework with Simple JWT",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
@@ -22,5 +22,7 @@
 	  "@types/react": "^18.0.0",
 	  "typescript": "^5.7.2",
 	  "eslint": "^8.0.0"
-	}
+	},
+	"tags": ["nextjs", "django", "jwt", "simple-jwt", "rest-framework"]
+	
   }
