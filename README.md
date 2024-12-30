@@ -1,5 +1,3 @@
-
-```markdown
 # Next.js Django Client SDK
 
 
