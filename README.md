@@ -2,8 +2,6 @@
 ```markdown
 # Next.js Django Client SDK
 
-[![npm version](https://badge.fury.io/js/nextjs-django-client.svg)](https://badge.fury.io/js/nextjs-django-client)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A modern, type-safe SDK for integrating Next.js 15+ applications with Django REST Framework backends using Simple JWT authentication. Built specifically for the Next.js App Router with full support for React Server Components, Server Actions, and Client Components.
 
