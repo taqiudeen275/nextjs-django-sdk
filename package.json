@@ -1,6 +1,6 @@
 {
 	"name": "nextjs-django-client",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"description": "A modern, type-safe SDK for integrating Next.js 15+ applications with Django REST Framework backends using Simple JWT authentication.",
 	"main": "dist/index.js",
 	"module": "dist/index.mjs",
