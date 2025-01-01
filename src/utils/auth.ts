@@ -1,6 +1,7 @@
 import { ApiConfig, User } from '../types';
 import { getApiClient } from './apiClient';
-import { getCookie, setCookie, deleteCookie } from './cookies';
+import { getClientCookie, setClientCookie, deleteClientCookie } from './clientCookies';
+
 
 export function getAuth(config: ApiConfig) {
   const apiClient = getApiClient(config);
@@ -16,8 +17,8 @@ export function getAuth(config: ApiConfig) {
       body: JSON.stringify(body),
     });
 
-    setCookie('access_token', response.access, config.accessTokenLifetime);
-    setCookie('refresh_token', response.refresh, config.refreshTokenLifetime);
+    await setClientCookie('access_token', response.access, config.accessTokenLifetime);
+    await setClientCookie('refresh_token', response.refresh, config.refreshTokenLifetime);
 
     const user = await getUser<U>();
     if (!user) {
@@ -26,9 +27,9 @@ export function getAuth(config: ApiConfig) {
     return user;
   };
 
-  const logout = () => {
-    deleteCookie('access_token');
-    deleteCookie('refresh_token');
+  const logout = async () => {
+    await deleteClientCookie('access_token');
+    await deleteClientCookie('refresh_token');
   };
 
   const getUser = async <U extends User>(): Promise<U | null> => {

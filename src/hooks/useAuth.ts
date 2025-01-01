@@ -66,7 +66,7 @@ export function useAuth<U extends User = User>(apiClient: ReturnType<typeof getA
   const logout = async () => {
     setIsLoading(true);
     try {
-      auth.logout();
+      await auth.logout();
       await mutate(null); // Update user data after logout
     } catch (err) {
       console.error('Logout failed:', err);
