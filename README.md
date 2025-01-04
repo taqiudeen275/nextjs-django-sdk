@@ -1,12 +1,12 @@
-# Next.js Django Client SDK
 
+# Next.js Django Client SDK
 
 A modern, type-safe SDK for integrating Next.js 15+ applications with Django REST Framework backends using Simple JWT authentication. Built specifically for the Next.js App Router with full support for React Server Components, Server Actions, and Client Components.
 
 ## Features
 
 -   🔐 **Secure JWT Authentication:** Automatic token refresh and secure cookie handling using the `HttpOnly` flag.
--   🎯 **Full Server Component & Server Actions Support:** Seamlessly fetch data and perform actions on the server.
+-   🎯 **Full Server Component & Server Actions Support:** Seamlessly fetch data and perform actions on the server with reliable authentication.
 -   ⚡ **Built-in SWR Data Fetching:** Leverage SWR's caching, revalidation, and performance benefits with TypeScript support.
 -   🔒 **CSRF Protection:** Built-in protection against Cross-Site Request Forgery attacks.
 -   🚀 **Optimized for Next.js 15+ App Router:** Designed to work efficiently with the latest Next.js features.
@@ -130,11 +130,11 @@ export function LoginForm() {
 
 ### 3. Server-Side Data Fetching
 
-Use `createServerAction` to create an API client instance for secure data fetching within Server Components or Server Actions:
+Use `createServerAction` to create an API client instance for secure data fetching within Server Components or Server Actions. **Pass the `serverAccessToken` from `useAuth` to `createServerAction` for reliable authentication.**
 
 ```typescript
 // app/posts/page.tsx (Server Component)
-import { createServerAction } from 'nextjs-django-client';
+import { createServerAction, useAuth } from 'nextjs-django-client';
 
 interface Post {
   id: number;
@@ -143,9 +143,13 @@ interface Post {
 }
 
 export default async function PostsPage() {
-  const api = await createServerAction({
-    baseUrl: process.env.API_URL!, // Your Django API base URL (can be different from client-side)
-  });
+  const { serverAccessToken } = useAuth(null); // Get the server-side access token
+  const api = await createServerAction(
+      {
+        baseUrl: process.env.API_URL!, // Your Django API base URL (can be different from client-side)
+      },
+      serverAccessToken
+    );
 
   try {
     const posts = await api.fetch<Post[]>('/api/posts/');
@@ -207,6 +211,245 @@ export function Posts() {
         </article>
       ))}
     </div>
+  );
+}
+```
+
+## CRUD Operations Examples
+
+Here's how to perform basic CRUD (Create, Read, Update, Delete) operations using the SDK:
+
+**Assumptions:**
+
+*   You have a Django REST Framework API with a `Post` model and corresponding endpoints (`/api/posts/`, `/api/posts/<id>/`).
+*   You have defined a `Post` interface in your Next.js application (as shown in previous examples).
+
+### Create (Client-Side)
+
+```typescript
+// app/components/CreatePost.tsx (Client Component)
+'use client';
+
+import { useState } from 'react';
+import { useApiClient } from 'nextjs-django-client';
+
+interface Post {
+  id: number;
+  title: string;
+  content: string;
+}
+
+export function CreatePost() {
+  const apiClient = useApiClient();
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const newPost = await apiClient.fetch<Post>('/api/posts/', {
+        method: 'POST',
+        body: JSON.stringify({ title, content }),
+      });
+
+      // Handle successful creation (e.g., clear form, redirect, update UI)
+      console.log('Post created:', newPost);
+      setTitle('');
+      setContent('');
+    } catch (error) {
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('An unexpected error occurred.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {error && <div>Error: {error}</div>}
+      <div>
+        <label htmlFor="title">Title:</label>
+        <input
+          id="title"
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor="content">Content:</label>
+        <textarea
+          id="content"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          required
+        />
+      </div>
+      <button type="submit" disabled={isLoading}>
+        {isLoading ? 'Creating...' : 'Create Post'}
+      </button>
+    </form>
+  );
+}
+```
+
+### Read (Server-Side)
+
+(See the Server-Side Data Fetching example in the Quick Start section.)
+
+### Read (Client-Side)
+
+(See the Client-Side Data Fetching with SWR example in the Quick Start section.)
+
+### Update (Client-Side)
+
+```typescript
+// app/components/EditPost.tsx (Client Component)
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useApi, useApiClient } from 'nextjs-django-client';
+import { useParams } from 'next/navigation';
+
+interface Post {
+  id: number;
+  title: string;
+  content: string;
+}
+
+export function EditPost() {
+  const apiClient = useApiClient();
+  const { id } = useParams<{ id: string }>(); // Assuming you're using dynamic routing
+  const { data: post, error, isLoading, mutate } = useApi<Post>(
+    id ? `/api/posts/${id}/` : null,
+    apiClient
+  );
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (post) {
+      setTitle(post.title);
+      setContent(post.content);
+    }
+  }, [post]);
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const updatedPost = await apiClient.fetch<Post>(`/api/posts/${id}/`, {
+        method: 'PUT',
+        body: JSON.stringify({ title, content }),
+      });
+
+      // Update the local data with SWR (optional)
+      mutate(updatedPost);
+
+      // Handle successful update (e.g., display success message)
+      console.log('Post updated:', updatedPost);
+    } catch (error) {
+      if (error instanceof Error) {
+        setSaveError(error.message);
+      } else {
+        setSaveError('An unexpected error occurred.');
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (error) return <div>Error loading post.</div>;
+  if (isLoading) return <div>Loading...</div>;
+  if (!post) return null;
+
+  return (
+    <form onSubmit={handleUpdate}>
+      {saveError && <div>Error: {saveError}</div>}
+      <div>
+        <label htmlFor="title">Title:</label>
+        <input
+          id="title"
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor="content">Content:</label>
+        <textarea
+          id="content"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          required
+        />
+      </div>
+      <button type="submit" disabled={isSaving}>
+        {isSaving ? 'Saving...' : 'Save Changes'}
+      </button>
+    </form>
+  );
+}
+```
+
+### Delete (Client-Side)
+
+```typescript
+// app/components/DeletePost.tsx (Client Component)
+'use client';
+
+import { useApiClient } from 'nextjs-django-client';
+import { useState } from 'react';
+
+interface Post {
+    id: number;
+    title: string;
+    content: string;
+  }
+  
+
+export function DeletePost({ post, onDelete }: { post: Post, onDelete: (id: number) => void }) {
+  const apiClient = useApiClient();
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!confirm('Are you sure you want to delete this post?')) return;
+
+    setIsDeleting(true);
+
+    try {
+      await apiClient.fetch(`/api/posts/${post.id}/`, {
+        method: 'DELETE',
+      });
+
+      // Handle successful deletion (e.g., update UI, remove post from list)
+      onDelete(post.id); // Call a callback function to update the parent component
+      console.log('Post deleted:', post.id);
+    } catch (error) {
+      console.error('Error deleting post:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <button onClick={handleDelete} disabled={isDeleting}>
+      {isDeleting ? 'Deleting...' : 'Delete'}
+    </button>
   );
 }
 ```
@@ -442,8 +685,6 @@ We welcome contributions! If you'd like to contribute to the project, please fol
 
 For major changes or new features, please open an **Issue** first to discuss your ideas with the maintainers.
 
-
 ## Support
 
 If you encounter any issues or have questions about the package, please feel free to open an issue on the [GitHub repository](https://github.com/taqiudeen275/nextjs-django-sdk). We appreciate your feedback!
-```

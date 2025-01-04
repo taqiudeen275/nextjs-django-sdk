@@ -1,30 +1,32 @@
 import { ApiConfig, FetchOptions, ApiError } from '../types';
 import { getClientCookie, setClientCookie, deleteClientCookie } from './clientCookies';
-import { deleteCookie, getCookie, setCookie } from './cookies';
 
 export function getApiClient(config: ApiConfig) {
+  const isServer = typeof window === 'undefined';
+
   const getHeaders = async (hasBody: boolean = false) => {
     const headers: Record<string, string> = {};
-    const accessToken = typeof window !== 'undefined' 
-      ? getClientCookie('access_token')
-      : await getCookie('access_token');
+    
+    if (!isServer) {
+      // Client-side cookie handling
+      const accessToken = getClientCookie('access_token');
+      if (accessToken) {
+        headers['Authorization'] = `${config.tokenPrefix || 'Bearer'} ${accessToken}`;
+      }
 
-    if (accessToken) {
-      headers['Authorization'] = `${config.tokenPrefix || 'Bearer'} ${accessToken}`;
-    }
+      if (hasBody) {
+        headers['Content-Type'] = 'application/json';
+      }
 
-    if (hasBody) {
-      headers['Content-Type'] = 'application/json';
-    }
-
-    if (config.csrfEnabled) {
-      const csrfToken = typeof window !== 'undefined'
-        ? getClientCookie('csrftoken')
-        : await getCookie('csrftoken');
-      if (csrfToken) {
-        headers['X-CSRFToken'] = csrfToken;
+      if (config.csrfEnabled) {
+        const csrfToken = getClientCookie('csrftoken');
+        if (csrfToken) {
+          headers['X-CSRFToken'] = csrfToken;
+        }
       }
     }
+    // Server-side header handling is done in createServerAction
+
     return headers;
   };
 
@@ -38,18 +40,13 @@ export function getApiClient(config: ApiConfig) {
       }
 
       if (response.status === 401) {
-        if (config.autoRefresh) {
+        if (config.autoRefresh && !isServer) {
           try {
             const refreshed = await refreshTokens();
             if (refreshed) return 'retry';
           } catch (refreshError) {
-            if (typeof window !== 'undefined') {
-              deleteClientCookie('access_token');
-              deleteClientCookie('refresh_token');
-            } else {
-              await deleteCookie('access_token');
-              await deleteCookie('refresh_token');
-            }
+            deleteClientCookie('access_token');
+            deleteClientCookie('refresh_token');
             throw new ApiError('Unauthorized', response.status, errorData);
           }
         }
@@ -66,13 +63,10 @@ export function getApiClient(config: ApiConfig) {
   };
 
   const refreshTokens = async () => {
-    const refreshToken = typeof window !== 'undefined'
-      ? getClientCookie('refresh_token')
-      : await getCookie('refresh_token');
+    if (isServer) return false;
 
-    if (!refreshToken) {
-      return false;
-    }
+    const refreshToken = getClientCookie('refresh_token');
+    if (!refreshToken) return false;
 
     try {
       const refreshResponse = await fetch(`${config.baseUrl}/api/token/refresh/`, {
@@ -85,11 +79,7 @@ export function getApiClient(config: ApiConfig) {
 
       const refreshData = await handleResponse(refreshResponse);
       if (refreshData !== 'retry') {
-        if (typeof window !== 'undefined') {
-          setClientCookie('access_token', refreshData.access, config.accessTokenLifetime);
-        } else {
-          await setCookie('access_token', refreshData.access, config.accessTokenLifetime);
-        }
+        setClientCookie('access_token', refreshData.access, config.accessTokenLifetime);
         return true;
       }
     } catch (error) {

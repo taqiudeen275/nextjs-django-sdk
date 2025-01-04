@@ -1,5 +1,7 @@
+// --- START OF FILE createServerAction.ts ---
 "use server";
 
+import { cookies } from 'next/headers';
 import { ApiConfig, FetchOptions } from '../types';
 import { getApiClient } from '../utils/apiClient';
 
@@ -9,7 +11,7 @@ const validateConfig = (config: Partial<ApiConfig>): void => {
   }
 };
 
-export async function createServerAction(config: Partial<ApiConfig>) {
+export async function createServerAction(config: Partial<ApiConfig>, accessToken?: string) {
   validateConfig(config);
 
   const fullConfig: ApiConfig = {
@@ -23,5 +25,44 @@ export async function createServerAction(config: Partial<ApiConfig>) {
     retryDelay: config.retryDelay || 3000,
   };
 
-  return getApiClient(fullConfig);
+  // Override the getHeaders function for server-side requests
+  const apiClient = getApiClient(fullConfig);
+  const originalGetHeaders = apiClient.getHeaders;
+
+  apiClient.getHeaders = async (hasBody: boolean = false) => {
+    const headers: Record<string, string> = {};
+    const cookieStore = await cookies();
+
+    // Prioritize passed-in token, then cookie, then nothing
+    const token = accessToken || cookieStore.get('access_token')?.value;
+
+    console.log('createServerAction - Passed-in Access Token:', accessToken);
+    console.log('createServerAction - Access Token from Cookie:', cookieStore.get('access_token')?.value);
+
+    if (token) {
+      headers['Authorization'] = `${fullConfig.tokenPrefix || 'Bearer'} ${token}`;
+      console.log('createServerAction - Setting Authorization header:', headers['Authorization']);
+    } else {
+      console.log('createServerAction - No access token found');
+    }
+
+    if (hasBody) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    if (fullConfig.csrfEnabled) {
+      const csrfToken = cookieStore.get('csrftoken')?.value;
+      if (csrfToken) {
+        headers['X-CSRFToken'] = csrfToken;
+        console.log('createServerAction - Setting X-CSRFToken header:', headers['X-CSRFToken']);
+      } else {
+        console.log('createServerAction - No CSRF token found');
+      }
+    }
+
+    console.log('createServerAction - Final headers:', headers);
+    return headers;
+  };
+
+  return apiClient;
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { getAuth } from '../utils/auth';
+import { getCookie } from '../utils/cookies';
 import { ApiConfig, User, ApiError } from '../types';
 import { useApiConfig } from '../components/ApiProvider';
 import { getApiClient } from '../utils/apiClient';
@@ -44,7 +45,7 @@ export function useAuth<U extends User = User>(apiClient: ReturnType<typeof getA
     }
   }, [user, error, mutate]);
 
-  const login = async (username: string, password: string, isEmail=true) => {
+  const login = async (username: string, password: string, isEmail=false) => {
     setIsLoading(true);
     try {
       const loggedInUser = await auth.login<U>(username, password, isEmail);
@@ -75,11 +76,14 @@ export function useAuth<U extends User = User>(apiClient: ReturnType<typeof getA
     }
   };
 
+  const serverAccessToken = getCookie('access_token');
+
   return {
     user,
     isLoading,
     error,
     login,
     logout,
+    serverAccessToken, 
   };
 }
