@@ -9,10 +9,11 @@ export function getAuth(config: ApiConfig) {
   const login = async <U extends User>(
     username: string,
     password: string,
-    isEmail: boolean
+    isEmail: boolean,
+    url: string,
   ): Promise<U> => {
     const body = isEmail ? { email: username, password }: { username, password };
-    const response:any = await apiClient.fetch('/api/token/', {
+    const response:any = await apiClient.fetch(url, {
       method: 'POST',
       body: JSON.stringify(body),
     });
